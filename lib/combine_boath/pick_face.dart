@@ -5,7 +5,7 @@ import 'package:image_picker/image_picker.dart';
 
 class PickFace {
 
-  PickFace({required this.setImage, required this.onImage,required this.onError});
+  PickFace(this.onLoading, {required this.setImage, required this.onImage,required this.onError});
 
   final FaceDetector _faceDetector = FaceDetector(
     options: FaceDetectorOptions(
@@ -16,6 +16,7 @@ class PickFace {
 
   bool _isBusy = false;
 
+  final Function(bool isLoading) onLoading;
   final Function(File?) setImage;
   final Function(Face face, File imageFile) onImage;
   final Function(String error) onError;
@@ -24,17 +25,25 @@ class PickFace {
 
   Future pickImageFor({required ImageSource source}) async {
 
+    onLoading(true);
     setImage(null);
 
-    final pickedFile = await imagePicker.pickImage(source: source);
-    if (pickedFile != null) {
-      _processPickedFile(pickedFile);
+    try {
+      final pickedFile = await imagePicker.pickImage(source: source,imageQuality: 50,maxHeight: 700,maxWidth: 500);
+      if (pickedFile != null) {
+        _processPickedFile(pickedFile);
+      } else {
+        onLoading(false);
+      }
+    } catch (e) {
+      onLoading(false);
     }
   }
 
   Future _processPickedFile(XFile? pickedFile) async {
     final path = pickedFile?.path;
     if (path == null) {
+      onLoading(false);
       return;
     }
     setImage(File(path));
@@ -44,10 +53,10 @@ class PickFace {
   }
 
   Future<void> processImage(InputImage inputImage, File imageFile) async {
-
+    onLoading(false);
     if (_isBusy) return;
     _isBusy = true;
-
+    onLoading(true);
     try {
       print("Loading Started");
 
@@ -69,6 +78,7 @@ class PickFace {
             }
 
             if(faces.length == 1) {
+              onLoading(false);
               onImage(faces.first,imageFile);
             } else {
               onError("Too many Faces");
@@ -90,6 +100,7 @@ class PickFace {
             }
 
             if(faces.length == 1) {
+              onLoading(false);
               onImage(faces.first,imageFile);
             } else {
               onError("Too many Faces");
@@ -97,8 +108,10 @@ class PickFace {
           }
     } catch (e) {
       print("Error $e");
+      onLoading(false);
     } finally {
       _isBusy = false;
+
     }
     print("Loading Completed");
   }

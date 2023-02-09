@@ -8,13 +8,13 @@ import 'package:image/image.dart' as imglib;
 class ImageProcessingService {
 
   Interpreter? _interpreter;
-  double threshold = 1;
+  double threshold = 1.1;
 
   List _predictedData = [];
   List get predictedData => _predictedData;
 
   Future initialize() async {
-    late Delegate delegate;
+    Delegate? delegate;
     try {
       if (Platform.isAndroid) {
         delegate = GpuDelegateV2(
@@ -34,6 +34,10 @@ class ImageProcessingService {
         // );
       }
       var interpreterOptions = InterpreterOptions();//..addDelegate(delegate);
+
+      if(delegate != null) {
+        interpreterOptions.addDelegate(delegate);
+      }
 
       _interpreter = await Interpreter.fromAsset('mobilefacenet.tflite',
           options: interpreterOptions);

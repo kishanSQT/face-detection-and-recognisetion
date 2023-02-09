@@ -16,7 +16,6 @@ class FaceScanScreen extends StatefulWidget {
 }
 
 class _FaceScanScreenState extends State<FaceScanScreen> {
-
   late PickFace pickFace;
 
   bool isMainImage = true;
@@ -33,6 +32,8 @@ class _FaceScanScreenState extends State<FaceScanScreen> {
 
   String text = "";
 
+  bool isLoading = false;
+
   @override
   void initState() {
     // TODO: implement initState
@@ -42,71 +43,101 @@ class _FaceScanScreenState extends State<FaceScanScreen> {
 
     imageService.initialize();
 
-    pickFace = PickFace(setImage: (imageFile) {
-
-      setState(() {
-        if(isMainImage) {
-          mainImageFile = imageFile;
-        } else {
-          checkImageFile = imageFile;
-        }
-      });
-
-    }, onImage: (faceDetected, image) async {
-
-      print(faceDetected.boundingBox);
-
-      final imageBytes = await image.readAsBytes();
-
-      imglib.Image? imageInput = imglib.decodeImage(imageBytes);
-
-      if(imageInput != null) {
-
-        double x = faceDetected.boundingBox.left;
-        double y = faceDetected.boundingBox.top;
-        double w = faceDetected.boundingBox.width;
-        double h = faceDetected.boundingBox.height;
-
-        final cropperImage = imglib.copyCrop(imageInput, x.round(), y.round(), w.round(), h.round());
-
-        imglib.Image img = imglib.copyResizeCropSquare(cropperImage, 112);
-
+    pickFace = PickFace(
+      (isLoading) {
         setState(() {
-          imageData = Uint8List.fromList(imglib.encodePng(img));
+          this.isLoading = isLoading;
         });
+      },
+      setImage: (imageFile) {
+        setState(() {
+          if (isMainImage) {
+            mainImageFile = imageFile;
+          } else {
+            checkImageFile = imageFile;
+          }
+        });
+      },
+      onImage: (faceDetected, image) async {
+        setState(() {
+          isLoading = true;
+        });
+        print("TIME Start ${DateTime.now().millisecondsSinceEpoch}");
+        try {
+          print(faceDetected.boundingBox);
 
-        if(isMainImage) {
+          final imageBytes = await image.readAsBytes();
 
-          mainImageList = imageService.setPrediction(image: img);
+          // await Future.delayed(Duration(seconds: 1));
 
-        } else {
+          print("TIME before decode ${DateTime.now().millisecondsSinceEpoch}");
 
-          checkImageList = imageService.setPrediction(image: img);
+          imglib.Image? imageInput = imglib.decodeImage(imageBytes);
 
-          try {
-            final match = imageService.isMatch(mainImageList, checkImageList);
+          if (imageInput != null) {
 
-            print("isMatch ${match.isMatch}");
-            print("isMatch ${match.isMatch}");
+            const offset = 25;
+
+            double x = faceDetected.boundingBox.left - offset;
+            double y = faceDetected.boundingBox.top - offset;
+            double w = faceDetected.boundingBox.width + (offset * 2);
+            double h = faceDetected.boundingBox.height + (offset * 2);
+
+            print("TIME before crop ${DateTime.now().millisecondsSinceEpoch}");
+            final cropperImage = imglib.copyCrop(
+                imageInput, x.round(), y.round(), w.round(), h.round());
+
+            print("TIME after crop ${DateTime.now().millisecondsSinceEpoch}");
+
+            imglib.Image img = imglib.copyResizeCropSquare(cropperImage, 112);
+
+            print("TIME after resize ${DateTime.now().millisecondsSinceEpoch}");
 
             setState(() {
-              text = "is Match = ${match.isMatch}\naccuracy = ${match.accuracy}";
+              imageData = Uint8List.fromList(imglib.encodePng(img));
             });
 
-          } catch (e) {
-            print(e);
+            if (isMainImage) {
+              mainImageList = imageService.setPrediction(image: img);
+            } else {
+              checkImageList = imageService.setPrediction(image: img);
+
+              try {
+                final match =
+                    imageService.isMatch(mainImageList, checkImageList);
+
+                print("isMatch ${match.isMatch}");
+                print("isMatch ${match.isMatch}");
+
+                setState(() {
+                  text =
+                      "is Match = ${match.isMatch}\naccuracy = ${match.accuracy}";
+                });
+              } catch (e) {
+                print(e);
+              }
+            }
           }
-
+        } catch (e) {
+          print(e);
+        } finally {
+          setState(() {
+            isLoading = false;
+          });
+          print("TIME End ${DateTime.now().millisecondsSinceEpoch}");
         }
-
-
-
-      }
-
-    },onError: (error) {
-      print("ERROR $error");
-    },);
-
+      },
+      onError: (error) {
+        print("ERROR $error");
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(error),
+          duration: const Duration(seconds: 3),
+        ));
+        setState(() {
+          isLoading = false;
+        });
+      },
+    );
   }
 
   @override
@@ -115,54 +146,79 @@ class _FaceScanScreenState extends State<FaceScanScreen> {
       appBar: AppBar(
         title: Text("Scan For All"),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(15),
-            child: Row(
-              children: [
-                Expanded(child: Column(children: [
-                  AspectRatio(
-                    aspectRatio: 1,
-                    child: Container(
-                      color: Colors.blue,
-                      padding: EdgeInsets.all(2),
-                      child: mainImageFile != null ? Image.file(mainImageFile!) : null,
-                    ),
-                  ),
-                  ElevatedButton(onPressed: () {
-                    isMainImage = true;
-                    pickFace.pickImageFor(source: ImageSource.gallery);
-                  }, child: Text("Pick main Image"))
-                ],)),
-                SizedBox(width: 15),
-                Expanded(child: Column(children: [
-                  AspectRatio(
-                    aspectRatio: 1,
-                    child: Container(
-                      color: Colors.yellow,
-                      padding: EdgeInsets.all(2),
-                      child: checkImageFile != null ? Image.file(checkImageFile!) : null,
-                    ),
-                  ),
-                  ElevatedButton(onPressed: () {
-                    isMainImage = false;
-                    pickFace.pickImageFor(source: ImageSource.gallery);
-                  }, child: Text("Pick check Image"))
-                ],)),
-              ],
-            ),
+          Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(15),
+                child: Row(
+                  children: [
+                    Expanded(
+                        child: Column(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: Container(
+                            color: Colors.blue,
+                            padding: EdgeInsets.all(2),
+                            child: mainImageFile != null
+                                ? Image.file(mainImageFile!)
+                                : null,
+                          ),
+                        ),
+                        ElevatedButton(
+                            onPressed: () {
+                              isMainImage = true;
+                              pickFace.pickImageFor(
+                                  source: ImageSource.gallery);
+                            },
+                            child: Text("Pick main Image"))
+                      ],
+                    )),
+                    SizedBox(width: 15),
+                    Expanded(
+                        child: Column(
+                      children: [
+                        AspectRatio(
+                          aspectRatio: 1,
+                          child: Container(
+                            color: Colors.yellow,
+                            padding: EdgeInsets.all(2),
+                            child: checkImageFile != null
+                                ? Image.file(checkImageFile!)
+                                : null,
+                          ),
+                        ),
+                        ElevatedButton(
+                            onPressed: () {
+                              isMainImage = false;
+                              pickFace.pickImageFor(
+                                  source: ImageSource.gallery);
+                            },
+                            child: Text("Pick check Image"))
+                      ],
+                    )),
+                  ],
+                ),
+              ),
+              Text(text),
+              if (imageData != null)
+                SizedBox(
+                  width: 100,
+                  height: 100,
+                  child: Image.memory(imageData!),
+                )
+            ],
           ),
-
-          Text(text),
-
-          if(imageData != null)
-          SizedBox(
-            width: 100,
-            height: 100,
-            child: Image.memory(imageData!),
-          )
-
+          if (isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.4),
+              alignment: Alignment.center,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+              ),
+            )
         ],
       ),
     );
