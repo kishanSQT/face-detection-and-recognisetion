@@ -19,6 +19,8 @@ class _CameraViewState extends State<CameraView> {
 
   bool isReady = false;
 
+  CameraImage? lastCameraImage;
+
   @override
   void initState() {
     // TODO: implement initState
@@ -58,7 +60,16 @@ class _CameraViewState extends State<CameraView> {
 
   }
 
+  onCaptureButton() async {
+    await controller.stopImageStream();
+
+    if(lastCameraImage != null) {
+      _processCameraImage(lastCameraImage!);
+    }
+  }
+
   Future _processCameraImage(CameraImage image) async {
+    lastCameraImage = image;
     final WriteBuffer allBytes = WriteBuffer();
 
     for (final Plane plane in image.planes) {

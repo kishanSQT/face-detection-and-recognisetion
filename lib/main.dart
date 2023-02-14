@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'combine_boath/face_scan_screen.dart';
 import 'face_detection/face_detector.dart';
 import 'face_recognisetion/face_recognisetion_screen.dart';
+import 'final_setup/select_user_profile_pic.dart';
 
 
 void main() {
@@ -29,7 +30,7 @@ class MyApp extends StatelessWidget {
         // is not restarted.
         primarySwatch: Colors.blue,
       ),
-      home: const FaceScanScreen(),
+      home: const SelectUserProfilePic(),
     );
   }
 }
